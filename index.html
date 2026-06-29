@@ -11,45 +11,78 @@
         * { margin: 0; padding: 0; box-sizing: border-box; }
 
         :root {
-            --bg: #f7f7f8;
-            --card: #ffffff;
-            --ink: #1d1d1f;
-            --muted: #86868b;
-            --line: #e6e6e8;
-            --on: #34c759;
-            --off: #ff3b30;
-            --accent: #007aff;
+            color-scheme: light dark;
+            --bg: #f4f5fb;
+            --bg-grad: radial-gradient(1200px 600px at 50% -10%, #e9ecff 0%, #f4f5fb 60%);
+            --card: rgba(255,255,255,0.85);
+            --card-solid: #ffffff;
+            --ink: #14151a;
+            --muted: #71727f;
+            --line: #e7e8f0;
+            --field: #f3f4fa;
+            --on: #16b364;
+            --on-soft: rgba(22,179,100,0.14);
+            --off: #f0445a;
+            --accent: #6366f1;
+            --accent-ink: #ffffff;
+            --shadow: 0 10px 30px -12px rgba(40,42,80,0.22);
+        }
+
+        @media (prefers-color-scheme: dark) {
+            :root {
+                --bg: #0d0e14;
+                --bg-grad: radial-gradient(1200px 600px at 50% -10%, #1b1d31 0%, #0d0e14 60%);
+                --card: rgba(26,27,38,0.72);
+                --card-solid: #1a1b26;
+                --ink: #f1f2f7;
+                --muted: #9a9bac;
+                --line: #2a2c3c;
+                --field: #20212e;
+                --on: #2dd47f;
+                --on-soft: rgba(45,212,127,0.16);
+                --off: #ff5f72;
+                --accent: #818cf8;
+                --accent-ink: #0d0e14;
+                --shadow: 0 14px 40px -14px rgba(0,0,0,0.7);
+            }
         }
 
         body {
             font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-            background: var(--bg);
+            background: var(--bg-grad), var(--bg);
+            background-attachment: fixed;
             color: var(--ink);
             line-height: 1.5;
-            padding: 24px 16px 64px;
+            padding: 32px 16px 64px;
+            -webkit-font-smoothing: antialiased;
         }
 
-        .container { max-width: 560px; margin: 0 auto; }
+        .container { max-width: 540px; margin: 0 auto; }
 
+        header { text-align: center; margin-bottom: 26px; }
         h1 {
-            font-size: 1.5rem;
-            text-align: center;
-            margin-bottom: 4px;
+            font-size: 1.4rem;
+            font-weight: 700;
+            letter-spacing: -0.02em;
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
         }
         .date {
-            text-align: center;
             color: var(--muted);
-            font-size: 0.9rem;
-            margin-bottom: 24px;
+            font-size: 0.875rem;
+            margin-top: 4px;
         }
 
         .card {
             background: var(--card);
+            backdrop-filter: saturate(180%) blur(20px);
+            -webkit-backdrop-filter: saturate(180%) blur(20px);
             border: 1px solid var(--line);
-            border-radius: 16px;
-            padding: 24px;
-            margin-bottom: 20px;
-            box-shadow: 0 1px 3px rgba(0,0,0,0.04);
+            border-radius: 22px;
+            padding: 26px;
+            margin-bottom: 18px;
+            box-shadow: var(--shadow);
         }
 
         .today { text-align: center; }
@@ -58,93 +91,167 @@
             display: inline-flex;
             align-items: center;
             gap: 8px;
-            font-size: 0.9rem;
+            font-size: 0.8rem;
+            font-weight: 600;
+            letter-spacing: 0.02em;
+            text-transform: uppercase;
             color: var(--muted);
-            margin-bottom: 8px;
+            background: var(--field);
+            padding: 6px 12px;
+            border-radius: 999px;
+            margin-bottom: 18px;
         }
         .dot {
-            width: 10px; height: 10px; border-radius: 50%;
-            background: var(--off);
+            width: 8px; height: 8px; border-radius: 50%;
+            background: var(--muted);
             transition: background 0.2s;
         }
         .dot.on { background: var(--on); animation: pulse 2s infinite; }
         @keyframes pulse {
-            0% { box-shadow: 0 0 0 0 rgba(52,199,89,0.4); }
-            70% { box-shadow: 0 0 0 8px rgba(52,199,89,0); }
-            100% { box-shadow: 0 0 0 0 rgba(52,199,89,0); }
+            0% { box-shadow: 0 0 0 0 var(--on-soft); }
+            70% { box-shadow: 0 0 0 9px transparent; }
+            100% { box-shadow: 0 0 0 0 transparent; }
         }
 
         .total {
-            font-size: 3rem;
-            font-weight: 600;
+            font-size: 3.4rem;
+            font-weight: 700;
             font-variant-numeric: tabular-nums;
-            letter-spacing: -1px;
-            margin: 4px 0 20px;
+            letter-spacing: -0.03em;
+            margin: 2px 0 22px;
+            line-height: 1;
         }
+        .total .u { font-size: 1.4rem; font-weight: 600; color: var(--muted); margin: 0 2px 0 1px; }
 
         button {
             font-family: inherit;
             font-size: 1.05rem;
-            font-weight: 600;
+            font-weight: 650;
             border: none;
-            border-radius: 12px;
+            border-radius: 14px;
             padding: 16px 32px;
             cursor: pointer;
             color: #fff;
-            transition: transform 0.08s, opacity 0.2s;
+            transition: transform 0.08s ease, filter 0.2s;
             width: 100%;
         }
-        button:active { transform: scale(0.98); }
-        .btn-on { background: var(--on); }
-        .btn-off { background: var(--off); }
+        button:hover { filter: brightness(1.05); }
+        button:active { transform: scale(0.985); }
+        .btn-on { background: linear-gradient(180deg, var(--on), color-mix(in srgb, var(--on) 84%, black)); }
+        .btn-off { background: linear-gradient(180deg, var(--off), color-mix(in srgb, var(--off) 84%, black)); }
 
         .sessions {
             list-style: none;
             margin-top: 18px;
-            font-size: 0.85rem;
-            color: var(--muted);
+            font-size: 0.875rem;
         }
         .sessions li {
             display: flex;
-            justify-content: space-between;
-            padding: 4px 0;
+            align-items: center;
+            gap: 10px;
+            padding: 9px 0;
             border-top: 1px solid var(--line);
         }
         .sessions li:first-child { border-top: none; }
+        .sessions .times { flex: 1; text-align: left; color: var(--ink); }
+        .sessions .dur { font-variant-numeric: tabular-nums; color: var(--muted); font-weight: 600; }
+
+        .del {
+            background: none;
+            border: none;
+            color: var(--muted);
+            font-size: 0.95rem;
+            line-height: 1;
+            width: 26px;
+            height: 26px;
+            border-radius: 8px;
+            padding: 0;
+            cursor: pointer;
+            opacity: 0.55;
+            flex: 0 0 auto;
+            transition: background 0.15s, color 0.15s, opacity 0.15s;
+        }
+        .del:hover { color: var(--off); opacity: 1; background: color-mix(in srgb, var(--off) 14%, transparent); }
+        .del:active { transform: none; }
+
+        .add-row {
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+            margin-top: 16px;
+            padding-top: 16px;
+            border-top: 1px dashed var(--line);
+        }
+        .time-group {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+        .add-row input {
+            font-family: inherit;
+            font-size: 0.85rem;
+            padding: 9px 10px;
+            border: 1px solid var(--line);
+            border-radius: 10px;
+            color: var(--ink);
+            background: var(--field);
+            min-width: 0;
+        }
+        .add-row input:focus { outline: 2px solid var(--accent); outline-offset: -1px; border-color: transparent; }
+        .add-row input[type="date"] { width: 100%; }
+        .add-row input[type="time"] { flex: 1 1 0; }
+        .add-row .sep { color: var(--muted); font-size: 0.85rem; flex: 0 0 auto; }
+        .btn-add {
+            width: auto;
+            flex: 0 0 auto;
+            font-size: 0.85rem;
+            font-weight: 650;
+            padding: 9px 16px;
+            border-radius: 10px;
+            color: var(--accent-ink);
+            background: var(--accent);
+        }
 
         h2 {
-            font-size: 1rem;
-            margin-bottom: 12px;
-            color: var(--ink);
+            font-size: 0.8rem;
+            font-weight: 700;
+            letter-spacing: 0.04em;
+            text-transform: uppercase;
+            color: var(--muted);
+            margin-bottom: 6px;
         }
         .history { list-style: none; }
         .history li {
             display: flex;
             justify-content: space-between;
             align-items: center;
-            padding: 12px 0;
+            gap: 10px;
+            padding: 13px 0;
             border-top: 1px solid var(--line);
             font-size: 0.95rem;
         }
         .history li:first-child { border-top: none; }
-        .history .day { font-variant-numeric: tabular-nums; }
-        .history .hrs { font-weight: 600; font-variant-numeric: tabular-nums; }
+        .history .day { font-variant-numeric: tabular-nums; flex: 1; }
+        .history .hrs { font-weight: 700; font-variant-numeric: tabular-nums; }
         .history .weekday { color: var(--muted); font-size: 0.8rem; margin-left: 8px; }
-        .empty { color: var(--muted); font-size: 0.9rem; text-align: center; padding: 8px 0; }
+        .empty { color: var(--muted); font-size: 0.9rem; text-align: center; padding: 14px 0; }
 
         .footer {
             text-align: center;
-            margin-top: 24px;
+            margin-top: 22px;
             font-size: 0.8rem;
             color: var(--muted);
         }
-        .footer a { color: var(--accent); text-decoration: none; cursor: pointer; }
+        .footer a { color: var(--accent); text-decoration: none; cursor: pointer; font-weight: 600; }
+        .footer a:hover { text-decoration: underline; }
     </style>
 </head>
 <body>
     <div class="container">
-        <h1>⏱️ Time Tracker</h1>
-        <p class="date" id="today-date"></p>
+        <header>
+            <h1>⏱️ Time Tracker</h1>
+            <p class="date" id="today-date"></p>
+        </header>
 
         <div class="card today">
             <div class="status">
@@ -154,6 +261,15 @@
             <div class="total" id="total">0h 00m</div>
             <button id="toggle"></button>
             <ul class="sessions" id="sessions"></ul>
+            <div class="add-row">
+                <input type="date" id="add-date" aria-label="Date">
+                <div class="time-group">
+                    <input type="time" id="add-start" aria-label="Start time">
+                    <span class="sep">→</span>
+                    <input type="time" id="add-end" aria-label="End time">
+                    <button class="btn-add" id="add-btn">+ Add</button>
+                </div>
+            </div>
         </div>
 
         <div class="card">
@@ -185,6 +301,12 @@
             const m = totalMin % 60;
             return `${h}h ${String(m).padStart(2,'0')}m`;
         };
+        const fmtTotalHTML = (ms) => {
+            const totalMin = Math.floor(ms / 60000);
+            const h = Math.floor(totalMin / 60);
+            const m = totalMin % 60;
+            return `${h}<span class="u">h</span>${String(m).padStart(2,'0')}<span class="u">m</span>`;
+        };
         const fmtClock = (ms) => new Date(ms).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
         const dayTotal = (sessions, now) =>
             sessions.reduce((sum, s) => sum + ((s.end ?? now) - s.start), 0);
@@ -200,6 +322,10 @@
             sessions: document.getElementById('sessions'),
             history: document.getElementById('history'),
             export: document.getElementById('export'),
+            addDate: document.getElementById('add-date'),
+            addStart: document.getElementById('add-start'),
+            addEnd: document.getElementById('add-end'),
+            addBtn: document.getElementById('add-btn'),
         };
 
         let tick = null;
@@ -218,21 +344,62 @@
             render();
         }
 
+        function deleteSession(index) {
+            const data = load();
+            const key = todayKey();
+            const sessions = data[key] || [];
+            sessions.splice(index, 1);
+            if (sessions.length) data[key] = sessions; else delete data[key];
+            save(data);
+            render();
+        }
+
+        function deleteDay(key) {
+            const data = load();
+            delete data[key];
+            save(data);
+            render();
+        }
+
+        // build a ms timestamp for "HH:MM" on a given "YYYY-MM-DD"
+        function timeToDate(dateStr, timeStr) {
+            const [y, mo, d] = dateStr.split('-').map(Number);
+            const [h, m] = timeStr.split(':').map(Number);
+            return new Date(y, mo - 1, d, h, m, 0, 0).getTime();
+        }
+
+        function addManual() {
+            const dv = el.addDate.value, sv = el.addStart.value, ev = el.addEnd.value;
+            if (!dv || !sv || !ev) { alert('Pick a date, start and end time.'); return; }
+            let start = timeToDate(dv, sv), end = timeToDate(dv, ev);
+            if (end <= start) { alert('End time must be after start time.'); return; }
+            const data = load();
+            const key = dv;
+            const sessions = data[key] || [];
+            sessions.push({ start, end });
+            sessions.sort((a, b) => a.start - b.start);
+            data[key] = sessions;
+            save(data);
+            el.addStart.value = ''; el.addEnd.value = ''; el.addDate.value = todayKey();
+            render();
+        }
+
         function renderToday() {
             const data = load();
             const sessions = data[todayKey()] || [];
             const running = isRunning(sessions);
             const now = Date.now();
 
-            el.total.textContent = fmtDuration(dayTotal(sessions, now));
+            el.total.innerHTML = fmtTotalHTML(dayTotal(sessions, now));
             el.dot.classList.toggle('on', running);
             el.statusText.textContent = running ? 'Working…' : (sessions.length ? 'On a break' : 'Not working');
             el.toggle.textContent = running ? 'Clock Out' : 'Clock In';
             el.toggle.className = running ? 'btn-off' : 'btn-on';
 
-            el.sessions.innerHTML = sessions.map(s =>
-                `<li><span>${fmtClock(s.start)} → ${s.end ? fmtClock(s.end) : 'now'}</span>` +
-                `<span>${fmtDuration((s.end ?? now) - s.start)}</span></li>`
+            el.sessions.innerHTML = sessions.map((s, i) =>
+                `<li><span class="times">${fmtClock(s.start)} → ${s.end ? fmtClock(s.end) : 'now'}</span>` +
+                `<span class="dur">${fmtDuration((s.end ?? now) - s.start)}</span>` +
+                `<button class="del" data-del-session="${i}" title="Delete">✕</button></li>`
             ).join('');
 
             // live ticking only while running
@@ -252,7 +419,8 @@
                 const total = dayTotal(data[k], Date.now());
                 const wd = new Date(k + 'T00:00').toLocaleDateString([], { weekday: 'short' });
                 return `<li><span class="day">${k}<span class="weekday">${wd}</span></span>` +
-                       `<span class="hrs">${fmtDuration(total)}</span></li>`;
+                       `<span class="hrs">${fmtDuration(total)}</span>` +
+                       `<button class="del" data-del-day="${k}" title="Delete day">✕</button></li>`;
             }).join('');
         }
 
@@ -273,8 +441,18 @@
 
         // ===== Init =====
         el.date.textContent = new Date().toLocaleDateString([], { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' });
+        el.addDate.value = todayKey();
         el.toggle.addEventListener('click', toggle);
         el.export.addEventListener('click', exportCSV);
+        el.addBtn.addEventListener('click', addManual);
+        el.sessions.addEventListener('click', (e) => {
+            const i = e.target.dataset.delSession;
+            if (i != null) deleteSession(Number(i));
+        });
+        el.history.addEventListener('click', (e) => {
+            const k = e.target.dataset.delDay;
+            if (k && confirm(`Delete all sessions for ${k}?`)) deleteDay(k);
+        });
         // re-render when tab regains focus (handles midnight rollover / other tabs)
         document.addEventListener('visibilitychange', () => { if (!document.hidden) render(); });
         render();
