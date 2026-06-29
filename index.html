@@ -1,0 +1,283 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="description" content="Simple on/off daily work time tracker">
+    <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>⏱️</text></svg>">
+    <title>Time Tracker</title>
+
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+
+        :root {
+            --bg: #f7f7f8;
+            --card: #ffffff;
+            --ink: #1d1d1f;
+            --muted: #86868b;
+            --line: #e6e6e8;
+            --on: #34c759;
+            --off: #ff3b30;
+            --accent: #007aff;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: var(--bg);
+            color: var(--ink);
+            line-height: 1.5;
+            padding: 24px 16px 64px;
+        }
+
+        .container { max-width: 560px; margin: 0 auto; }
+
+        h1 {
+            font-size: 1.5rem;
+            text-align: center;
+            margin-bottom: 4px;
+        }
+        .date {
+            text-align: center;
+            color: var(--muted);
+            font-size: 0.9rem;
+            margin-bottom: 24px;
+        }
+
+        .card {
+            background: var(--card);
+            border: 1px solid var(--line);
+            border-radius: 16px;
+            padding: 24px;
+            margin-bottom: 20px;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.04);
+        }
+
+        .today { text-align: center; }
+
+        .status {
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            font-size: 0.9rem;
+            color: var(--muted);
+            margin-bottom: 8px;
+        }
+        .dot {
+            width: 10px; height: 10px; border-radius: 50%;
+            background: var(--off);
+            transition: background 0.2s;
+        }
+        .dot.on { background: var(--on); animation: pulse 2s infinite; }
+        @keyframes pulse {
+            0% { box-shadow: 0 0 0 0 rgba(52,199,89,0.4); }
+            70% { box-shadow: 0 0 0 8px rgba(52,199,89,0); }
+            100% { box-shadow: 0 0 0 0 rgba(52,199,89,0); }
+        }
+
+        .total {
+            font-size: 3rem;
+            font-weight: 600;
+            font-variant-numeric: tabular-nums;
+            letter-spacing: -1px;
+            margin: 4px 0 20px;
+        }
+
+        button {
+            font-family: inherit;
+            font-size: 1.05rem;
+            font-weight: 600;
+            border: none;
+            border-radius: 12px;
+            padding: 16px 32px;
+            cursor: pointer;
+            color: #fff;
+            transition: transform 0.08s, opacity 0.2s;
+            width: 100%;
+        }
+        button:active { transform: scale(0.98); }
+        .btn-on { background: var(--on); }
+        .btn-off { background: var(--off); }
+
+        .sessions {
+            list-style: none;
+            margin-top: 18px;
+            font-size: 0.85rem;
+            color: var(--muted);
+        }
+        .sessions li {
+            display: flex;
+            justify-content: space-between;
+            padding: 4px 0;
+            border-top: 1px solid var(--line);
+        }
+        .sessions li:first-child { border-top: none; }
+
+        h2 {
+            font-size: 1rem;
+            margin-bottom: 12px;
+            color: var(--ink);
+        }
+        .history { list-style: none; }
+        .history li {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 12px 0;
+            border-top: 1px solid var(--line);
+            font-size: 0.95rem;
+        }
+        .history li:first-child { border-top: none; }
+        .history .day { font-variant-numeric: tabular-nums; }
+        .history .hrs { font-weight: 600; font-variant-numeric: tabular-nums; }
+        .history .weekday { color: var(--muted); font-size: 0.8rem; margin-left: 8px; }
+        .empty { color: var(--muted); font-size: 0.9rem; text-align: center; padding: 8px 0; }
+
+        .footer {
+            text-align: center;
+            margin-top: 24px;
+            font-size: 0.8rem;
+            color: var(--muted);
+        }
+        .footer a { color: var(--accent); text-decoration: none; cursor: pointer; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>⏱️ Time Tracker</h1>
+        <p class="date" id="today-date"></p>
+
+        <div class="card today">
+            <div class="status">
+                <span class="dot" id="dot"></span>
+                <span id="status-text">Not working</span>
+            </div>
+            <div class="total" id="total">0h 00m</div>
+            <button id="toggle"></button>
+            <ul class="sessions" id="sessions"></ul>
+        </div>
+
+        <div class="card">
+            <h2>History</h2>
+            <ul class="history" id="history"></ul>
+        </div>
+
+        <p class="footer">
+            Stored locally in your browser · <a id="export">Export CSV</a>
+        </p>
+    </div>
+
+    <script>
+        const STORE_KEY = 'timeTracker';
+
+        // ===== Storage: { "YYYY-MM-DD": [{start: ms, end: ms|null}, ...] } =====
+        const load = () => { try { return JSON.parse(localStorage.getItem(STORE_KEY)) || {}; } catch { return {}; } };
+        const save = (data) => localStorage.setItem(STORE_KEY, JSON.stringify(data));
+
+        const todayKey = () => {
+            const d = new Date();
+            return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
+        };
+
+        // ===== Time helpers =====
+        const fmtDuration = (ms) => {
+            const totalMin = Math.floor(ms / 60000);
+            const h = Math.floor(totalMin / 60);
+            const m = totalMin % 60;
+            return `${h}h ${String(m).padStart(2,'0')}m`;
+        };
+        const fmtClock = (ms) => new Date(ms).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+        const dayTotal = (sessions, now) =>
+            sessions.reduce((sum, s) => sum + ((s.end ?? now) - s.start), 0);
+        const isRunning = (sessions) => sessions.length > 0 && sessions[sessions.length - 1].end == null;
+
+        // ===== Elements =====
+        const el = {
+            date: document.getElementById('today-date'),
+            dot: document.getElementById('dot'),
+            statusText: document.getElementById('status-text'),
+            total: document.getElementById('total'),
+            toggle: document.getElementById('toggle'),
+            sessions: document.getElementById('sessions'),
+            history: document.getElementById('history'),
+            export: document.getElementById('export'),
+        };
+
+        let tick = null;
+
+        function toggle() {
+            const data = load();
+            const key = todayKey();
+            const sessions = data[key] || [];
+            if (isRunning(sessions)) {
+                sessions[sessions.length - 1].end = Date.now();   // clock out
+            } else {
+                sessions.push({ start: Date.now(), end: null });  // clock in
+            }
+            data[key] = sessions;
+            save(data);
+            render();
+        }
+
+        function renderToday() {
+            const data = load();
+            const sessions = data[todayKey()] || [];
+            const running = isRunning(sessions);
+            const now = Date.now();
+
+            el.total.textContent = fmtDuration(dayTotal(sessions, now));
+            el.dot.classList.toggle('on', running);
+            el.statusText.textContent = running ? 'Working…' : (sessions.length ? 'On a break' : 'Not working');
+            el.toggle.textContent = running ? 'Clock Out' : 'Clock In';
+            el.toggle.className = running ? 'btn-off' : 'btn-on';
+
+            el.sessions.innerHTML = sessions.map(s =>
+                `<li><span>${fmtClock(s.start)} → ${s.end ? fmtClock(s.end) : 'now'}</span>` +
+                `<span>${fmtDuration((s.end ?? now) - s.start)}</span></li>`
+            ).join('');
+
+            // live ticking only while running
+            if (running && !tick) tick = setInterval(renderToday, 1000);
+            if (!running && tick) { clearInterval(tick); tick = null; }
+        }
+
+        function renderHistory() {
+            const data = load();
+            const today = todayKey();
+            const keys = Object.keys(data).filter(k => k !== today).sort().reverse();
+            if (!keys.length) {
+                el.history.innerHTML = '<li class="empty">No previous days yet</li>';
+                return;
+            }
+            el.history.innerHTML = keys.map(k => {
+                const total = dayTotal(data[k], Date.now());
+                const wd = new Date(k + 'T00:00').toLocaleDateString([], { weekday: 'short' });
+                return `<li><span class="day">${k}<span class="weekday">${wd}</span></span>` +
+                       `<span class="hrs">${fmtDuration(total)}</span></li>`;
+            }).join('');
+        }
+
+        function render() { renderToday(); renderHistory(); }
+
+        function exportCSV() {
+            const data = load();
+            const rows = [['date', 'hours']];
+            Object.keys(data).sort().forEach(k => {
+                rows.push([k, (dayTotal(data[k], Date.now()) / 3600000).toFixed(2)]);
+            });
+            const csv = rows.map(r => r.join(',')).join('\n');
+            const url = URL.createObjectURL(new Blob([csv], { type: 'text/csv' }));
+            const a = document.createElement('a');
+            a.href = url; a.download = 'time-tracker.csv'; a.click();
+            URL.revokeObjectURL(url);
+        }
+
+        // ===== Init =====
+        el.date.textContent = new Date().toLocaleDateString([], { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' });
+        el.toggle.addEventListener('click', toggle);
+        el.export.addEventListener('click', exportCSV);
+        // re-render when tab regains focus (handles midnight rollover / other tabs)
+        document.addEventListener('visibilitychange', () => { if (!document.hidden) render(); });
+        render();
+    </script>
+</body>
+</html>
