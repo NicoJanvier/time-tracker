@@ -5,6 +5,13 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <meta name="description" content="Simple on/off daily work time tracker">
     <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>⏱️</text></svg>">
+    <link rel="manifest" href="manifest.json">
+    <link rel="apple-touch-icon" href="icon.svg">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="apple-mobile-web-app-title" content="Tracker">
+    <meta name="theme-color" content="#f4f5fb" media="(prefers-color-scheme: light)">
+    <meta name="theme-color" content="#0d0e14" media="(prefers-color-scheme: dark)">
     <title>Time Tracker</title>
 
     <style>
@@ -122,6 +129,12 @@
             line-height: 1;
         }
         .total .u { font-size: 1.4rem; font-weight: 600; color: var(--muted); margin: 0 2px 0 1px; }
+        .weekstat {
+            font-size: 0.8rem;
+            color: var(--muted);
+            margin: -12px 0 20px;
+        }
+        .weekstat b { color: var(--ink); font-weight: 700; font-variant-numeric: tabular-nums; }
 
         button {
             font-family: inherit;
@@ -153,8 +166,26 @@
             border-top: 1px solid var(--line);
         }
         .sessions li:first-child { border-top: none; }
-        .sessions .times { flex: 1; text-align: left; color: var(--ink); }
+        .sessions .times { flex: 1; text-align: left; color: var(--ink); cursor: pointer; }
+        .sessions .times.editable:hover { color: var(--accent); }
         .sessions .dur { font-variant-numeric: tabular-nums; color: var(--muted); font-weight: 600; }
+        .sessions .live { color: var(--on); font-weight: 600; }
+        .sessions .cap { color: var(--off); font-size: 0.78rem; margin-left: 6px; }
+
+        /* inline edit row */
+        .edit-row { display: flex; align-items: center; gap: 6px; flex: 1; }
+        .edit-row input[type="time"] {
+            font-family: inherit; font-size: 0.85rem; padding: 6px 7px;
+            border: 1px solid var(--line); border-radius: 8px;
+            color: var(--ink); background: var(--field); flex: 1 1 0; min-width: 0;
+        }
+        .edit-row input:focus { outline: 2px solid var(--accent); outline-offset: -1px; }
+        .icon-btn {
+            width: 30px; height: 30px; border-radius: 8px; border: none;
+            font-size: 0.9rem; line-height: 1; padding: 0; cursor: pointer; flex: 0 0 auto;
+        }
+        .icon-btn.ok { background: var(--accent); color: var(--accent-ink); }
+        .icon-btn.cancel { background: var(--field); color: var(--muted); }
 
         .del {
             background: none;
@@ -221,19 +252,28 @@
             margin-bottom: 6px;
         }
         .history { list-style: none; }
-        .history li {
+        .hnode { border-top: 1px solid var(--line); }
+        .history > .hnode:first-child { border-top: none; }
+        .hnode-head {
             display: flex;
-            justify-content: space-between;
             align-items: center;
             gap: 10px;
-            padding: 13px 0;
-            border-top: 1px solid var(--line);
+            padding: 12px 0;
             font-size: 0.95rem;
+            cursor: pointer;
         }
-        .history li:first-child { border-top: none; }
-        .history .day { font-variant-numeric: tabular-nums; flex: 1; }
-        .history .hrs { font-weight: 700; font-variant-numeric: tabular-nums; }
-        .history .weekday { color: var(--muted); font-size: 0.8rem; margin-left: 8px; }
+        .hnode-head .caret {
+            color: var(--muted); font-size: 0.7rem; flex: 0 0 auto;
+            width: 10px; text-align: center; transition: transform 0.2s;
+        }
+        .hnode.open > .hnode-head .caret { transform: rotate(90deg); }
+        .hnode-head .label { flex: 1; }
+        .hnode-head.group .label { font-weight: 600; }
+        .hnode-head .hrs { font-weight: 700; font-variant-numeric: tabular-nums; color: var(--ink); }
+        .hnode-head.group .hrs { color: var(--muted); }
+        .hnode-body { display: none; padding-left: 16px; }
+        .hnode.open > .hnode-body { display: block; }
+        .hnode-body .sessions { margin-top: 2px; padding-bottom: 8px; }
         .empty { color: var(--muted); font-size: 0.9rem; text-align: center; padding: 14px 0; }
 
         .footer {
@@ -259,6 +299,7 @@
                 <span id="status-text">Not working</span>
             </div>
             <div class="total" id="total">0h 00m</div>
+            <div class="weekstat" id="weekstat"></div>
             <button id="toggle"></button>
             <ul class="sessions" id="sessions"></ul>
             <div class="add-row">
@@ -274,7 +315,7 @@
 
         <div class="card">
             <h2>History</h2>
-            <ul class="history" id="history"></ul>
+            <div class="history" id="history"></div>
         </div>
 
         <p class="footer">
@@ -289,27 +330,31 @@
         const load = () => { try { return JSON.parse(localStorage.getItem(STORE_KEY)) || {}; } catch { return {}; } };
         const save = (data) => localStorage.setItem(STORE_KEY, JSON.stringify(data));
 
-        const todayKey = () => {
-            const d = new Date();
-            return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
-        };
+        const pad = (n) => String(n).padStart(2, '0');
+        const keyOf = (d) => `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}`;
+        const todayKey = () => keyOf(new Date());
+
+        // end of the calendar day that contains ms
+        const endOfDay = (ms) => { const d = new Date(ms); d.setHours(23,59,59,999); return d.getTime(); };
+        // effective end for totals: real end, else cap at end of its own day or now (whichever first)
+        const effEnd = (s, now) => s.end ?? Math.min(now, endOfDay(s.start));
+
+        // monday-start week containing date d
+        const startOfWeek = (d) => { const x = new Date(d); x.setHours(0,0,0,0); x.setDate(x.getDate() - ((x.getDay()+6)%7)); return x.getTime(); };
 
         // ===== Time helpers =====
         const fmtDuration = (ms) => {
             const totalMin = Math.floor(ms / 60000);
-            const h = Math.floor(totalMin / 60);
-            const m = totalMin % 60;
-            return `${h}h ${String(m).padStart(2,'0')}m`;
+            return `${Math.floor(totalMin / 60)}h ${pad(totalMin % 60)}m`;
         };
         const fmtTotalHTML = (ms) => {
             const totalMin = Math.floor(ms / 60000);
-            const h = Math.floor(totalMin / 60);
-            const m = totalMin % 60;
-            return `${h}<span class="u">h</span>${String(m).padStart(2,'0')}<span class="u">m</span>`;
+            return `${Math.floor(totalMin / 60)}<span class="u">h</span>${pad(totalMin % 60)}<span class="u">m</span>`;
         };
         const fmtClock = (ms) => new Date(ms).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+        const toTimeVal = (ms) => { const d = new Date(ms); return `${pad(d.getHours())}:${pad(d.getMinutes())}`; };
         const dayTotal = (sessions, now) =>
-            sessions.reduce((sum, s) => sum + ((s.end ?? now) - s.start), 0);
+            sessions.reduce((sum, s) => sum + (effEnd(s, now) - s.start), 0);
         const isRunning = (sessions) => sessions.length > 0 && sessions[sessions.length - 1].end == null;
 
         // ===== Elements =====
@@ -318,6 +363,7 @@
             dot: document.getElementById('dot'),
             statusText: document.getElementById('status-text'),
             total: document.getElementById('total'),
+            weekstat: document.getElementById('weekstat'),
             toggle: document.getElementById('toggle'),
             sessions: document.getElementById('sessions'),
             history: document.getElementById('history'),
@@ -344,21 +390,25 @@
             render();
         }
 
-        function deleteSession(index) {
-            const data = load();
-            const key = todayKey();
-            const sessions = data[key] || [];
-            sessions.splice(index, 1);
-            if (sessions.length) data[key] = sessions; else delete data[key];
-            save(data);
-            render();
-        }
+        let editing = null;            // "YYYY-MM-DD#index" currently being edited
+        const openNodes = new Set();   // expanded history nodes (d:/w:/m: ids)
 
-        function deleteDay(key) {
-            const data = load();
-            delete data[key];
-            save(data);
-            render();
+        // ===== date grouping helpers =====
+        const dayMs = (k) => new Date(k + 'T00:00').getTime();
+        const monthStart = (d) => { const x = new Date(d); x.setHours(0,0,0,0); x.setDate(1); return x.getTime(); };
+        const groupBy = (arr, fn) => arr.reduce((o, x) => { const k = fn(x); (o[k] ||= []).push(x); return o; }, {});
+        const dayLabel = (k) => new Date(k + 'T00:00').toLocaleDateString([], { weekday: 'short', day: 'numeric', month: 'short' });
+        const monthLabel = (ms) => new Date(ms).toLocaleDateString([], { month: 'long', year: 'numeric' });
+        const isoWeek = (date) => {
+            const d = new Date(Date.UTC(date.getFullYear(), date.getMonth(), date.getDate()));
+            d.setUTCDate(d.getUTCDate() + 4 - (d.getUTCDay() || 7));   // nearest Thursday
+            const yearStart = new Date(Date.UTC(d.getUTCFullYear(), 0, 1));
+            return Math.ceil((((d - yearStart) / 86400000) + 1) / 7);
+        };
+        function weekLabel(startMs) {
+            const s = new Date(startMs), e = new Date(startMs); e.setDate(e.getDate() + 6);
+            const dm = (d) => d.toLocaleDateString([], { day: 'numeric', month: 'numeric' });
+            return `Week ${isoWeek(s)} — ${dm(s)} - ${dm(e)}`;
         }
 
         // build a ms timestamp for "HH:MM" on a given "YYYY-MM-DD"
@@ -368,20 +418,124 @@
             return new Date(y, mo - 1, d, h, m, 0, 0).getTime();
         }
 
+        // close any clock-in left running on a past day, capping it at end of that day
+        function autoCloseStale() {
+            const data = load(); const tk = todayKey(); let changed = false;
+            for (const k of Object.keys(data)) {
+                if (k === tk) continue;
+                for (const s of data[k]) {
+                    if (s.end == null) { s.end = endOfDay(s.start); s.capped = true; changed = true; }
+                }
+            }
+            if (changed) save(data);
+        }
+
+        // insert/replace a session into a day's array, resolving overlaps with completed sessions.
+        // returns the new array, or null if the user cancelled.
+        function applyWithOverlap(arr, cand, replaceIndex) {
+            const now = Date.now();
+            const rest = arr.filter((_, i) => i !== replaceIndex);
+            const overlaps = rest.filter(s => s.end != null && cand.start < s.end && cand.end > s.start);
+            if (!overlaps.length) {
+                rest.push(cand);
+            } else if (confirm(`Overlaps ${overlaps.length} existing session${overlaps.length>1?'s':''}.\n\nOK = merge into one, Cancel = choose to keep both.`)) {
+                const merged = {
+                    start: Math.min(cand.start, ...overlaps.map(s => s.start)),
+                    end:   Math.max(cand.end,   ...overlaps.map(s => effEnd(s, now))),
+                };
+                const kept = rest.filter(s => !overlaps.includes(s));
+                kept.push(merged);
+                kept.sort((a, b) => a.start - b.start);
+                return kept;
+            } else if (!confirm('Keep both overlapping sessions anyway?')) {
+                return null;   // cancelled entirely
+            } else {
+                rest.push(cand);   // keep both
+            }
+            rest.sort((a, b) => a.start - b.start);
+            return rest;
+        }
+
         function addManual() {
             const dv = el.addDate.value, sv = el.addStart.value, ev = el.addEnd.value;
             if (!dv || !sv || !ev) { alert('Pick a date, start and end time.'); return; }
-            let start = timeToDate(dv, sv), end = timeToDate(dv, ev);
+            const start = timeToDate(dv, sv), end = timeToDate(dv, ev);
             if (end <= start) { alert('End time must be after start time.'); return; }
             const data = load();
-            const key = dv;
-            const sessions = data[key] || [];
-            sessions.push({ start, end });
-            sessions.sort((a, b) => a.start - b.start);
-            data[key] = sessions;
+            const result = applyWithOverlap(data[dv] || [], { start, end }, null);
+            if (!result) return;
+            if (result.length) data[dv] = result; else delete data[dv];
             save(data);
             el.addStart.value = ''; el.addEnd.value = ''; el.addDate.value = todayKey();
             render();
+        }
+
+        function beginEdit(id) {
+            editing = id;
+            if (tick) { clearInterval(tick); tick = null; }
+            render();
+        }
+
+        function commitEdit(btn) {
+            const id = btn.dataset.save;
+            const li = btn.closest('li');
+            const sv = li.querySelector('.e-start').value, ev = li.querySelector('.e-end').value;
+            if (!sv || !ev) { alert('Pick start and end time.'); return; }
+            const [dk, idx] = id.split('#'); const i = Number(idx);
+            const start = timeToDate(dk, sv), end = timeToDate(dk, ev);
+            if (end <= start) { alert('End time must be after start time.'); return; }
+            const data = load();
+            const result = applyWithOverlap(data[dk] || [], { start, end }, i);
+            if (!result) return;
+            if (result.length) data[dk] = result; else delete data[dk];
+            save(data); editing = null; render();
+        }
+
+        function deleteSession(id) {
+            const [dk, idx] = id.split('#'); const i = Number(idx);
+            const data = load(); const arr = data[dk] || [];
+            arr.splice(i, 1);
+            if (arr.length) data[dk] = arr; else delete data[dk];
+            save(data); editing = null; render();
+        }
+
+        function deleteDay(key) {
+            const data = load();
+            delete data[key];
+            openNodes.delete('d:' + key);
+            save(data);
+            render();
+        }
+
+        function toggleNode(id) {
+            if (openNodes.has(id)) openNodes.delete(id); else openNodes.add(id);
+            renderHistory();
+        }
+
+        // shared renderer for a day's session list (today + expanded history)
+        function sessionsHTML(dateKey, arr) {
+            const now = Date.now();
+            return arr.map((s, i) => {
+                const id = `${dateKey}#${i}`;
+                if (editing === id) {
+                    return `<li><div class="edit-row">` +
+                        `<input type="time" class="e-start" value="${toTimeVal(s.start)}">` +
+                        `<span class="sep">→</span>` +
+                        `<input type="time" class="e-end" value="${toTimeVal(s.end ?? now)}">` +
+                        `<button class="icon-btn ok" data-save="${id}" title="Save">✓</button>` +
+                        `<button class="icon-btn cancel" data-cancel="1" title="Cancel">✕</button>` +
+                        `</div></li>`;
+                }
+                const running = s.end == null;
+                const endTxt = running ? '<span class="live">now</span>' : fmtClock(s.end);
+                const cap = s.capped ? '<span class="cap">auto-closed</span>' : '';
+                const cls = running ? 'times' : 'times editable';
+                const editAttr = running ? '' : ` data-edit="${id}"`;
+                return `<li>` +
+                    `<span class="${cls}"${editAttr}>${fmtClock(s.start)} → ${endTxt}${cap}</span>` +
+                    `<span class="dur">${fmtDuration(effEnd(s, now) - s.start)}</span>` +
+                    `<button class="del" data-del="${id}" title="Delete">✕</button></li>`;
+            }).join('');
         }
 
         function renderToday() {
@@ -395,36 +549,128 @@
             el.statusText.textContent = running ? 'Working…' : (sessions.length ? 'On a break' : 'Not working');
             el.toggle.textContent = running ? 'Clock Out' : 'Clock In';
             el.toggle.className = running ? 'btn-off' : 'btn-on';
+            el.sessions.innerHTML = sessionsHTML(todayKey(), sessions);
 
-            el.sessions.innerHTML = sessions.map((s, i) =>
-                `<li><span class="times">${fmtClock(s.start)} → ${s.end ? fmtClock(s.end) : 'now'}</span>` +
-                `<span class="dur">${fmtDuration((s.end ?? now) - s.start)}</span>` +
-                `<button class="del" data-del-session="${i}" title="Delete">✕</button></li>`
-            ).join('');
+            // live ticking only while running and not editing
+            const shouldTick = running && !editing;
+            if (shouldTick && !tick) tick = setInterval(renderToday, 1000);
+            if (!shouldTick && tick) { clearInterval(tick); tick = null; }
+        }
 
-            // live ticking only while running
-            if (running && !tick) tick = setInterval(renderToday, 1000);
-            if (!running && tick) { clearInterval(tick); tick = null; }
+        function renderWeek() {
+            const data = load(); const now = Date.now(); const sow = startOfWeek(new Date());
+            let sum = 0;
+            for (const k of Object.keys(data)) {
+                if (new Date(k + 'T00:00').getTime() >= sow) sum += dayTotal(data[k], now);
+            }
+            el.weekstat.innerHTML = `This week · <b>${fmtDuration(sum)}</b>`;
+        }
+
+        // a single day, expandable to its (editable) sessions
+        function dayNodeHTML(k, arr) {
+            const id = 'd:' + k, open = openNodes.has(id);
+            const total = fmtDuration(dayTotal(arr, Date.now()));
+            return `<div class="hnode${open ? ' open' : ''}">` +
+                `<div class="hnode-head" data-node="${id}">` +
+                    `<span class="caret">▶</span>` +
+                    `<span class="label">${dayLabel(k)}</span>` +
+                    `<span class="hrs">${total}</span>` +
+                    `<button class="del" data-delday="${k}" title="Delete day">✕</button>` +
+                `</div>` +
+                `<div class="hnode-body"><ul class="sessions">${sessionsHTML(k, arr)}</ul></div>` +
+            `</div>`;
+        }
+
+        // a collapsible group (week or month) wrapping child nodes
+        function groupNodeHTML(id, label, totalMs, childrenHTML) {
+            const open = openNodes.has(id);
+            return `<div class="hnode${open ? ' open' : ''}">` +
+                `<div class="hnode-head group" data-node="${id}">` +
+                    `<span class="caret">▶</span>` +
+                    `<span class="label">${label}</span>` +
+                    `<span class="hrs">${fmtDuration(totalMs)}</span>` +
+                `</div>` +
+                `<div class="hnode-body">${childrenHTML}</div>` +
+            `</div>`;
         }
 
         function renderHistory() {
-            const data = load();
-            const today = todayKey();
-            const keys = Object.keys(data).filter(k => k !== today).sort().reverse();
+            const data = load(); const now = Date.now();
+            const keys = Object.keys(data).filter(k => k !== todayKey());
             if (!keys.length) {
-                el.history.innerHTML = '<li class="empty">No previous days yet</li>';
+                el.history.innerHTML = '<div class="empty">No previous days yet</div>';
                 return;
             }
-            el.history.innerHTML = keys.map(k => {
-                const total = dayTotal(data[k], Date.now());
-                const wd = new Date(k + 'T00:00').toLocaleDateString([], { weekday: 'short' });
-                return `<li><span class="day">${k}<span class="weekday">${wd}</span></span>` +
-                       `<span class="hrs">${fmtDuration(total)}</span>` +
-                       `<button class="del" data-del-day="${k}" title="Delete day">✕</button></li>`;
-            }).join('');
+            const sow = startOfWeek(new Date()), som = monthStart(new Date());
+            const byDesc = (a, b) => dayMs(b) - dayMs(a);
+            const sumDays = (dks) => dks.reduce((s, k) => s + dayTotal(data[k], now), 0);
+
+            const thisWeek  = keys.filter(k => dayMs(k) >= sow).sort(byDesc);
+            const thisMonth = keys.filter(k => dayMs(k) < sow && dayMs(k) >= som);
+            const older     = keys.filter(k => dayMs(k) < som);
+
+            let html = '';
+
+            // 1) current week → one line per day
+            html += thisWeek.map(k => dayNodeHTML(k, data[k])).join('');
+
+            // 2) earlier this month → one line per week (expands to days)
+            const weeks = groupBy(thisMonth, k => keyOf(new Date(startOfWeek(dayMs(k)))));
+            Object.keys(weeks).sort().reverse().forEach(ws => {
+                const dks = weeks[ws].sort(byDesc);
+                const children = dks.map(k => dayNodeHTML(k, data[k])).join('');
+                html += groupNodeHTML('w:' + ws, weekLabel(dayMs(ws)), sumDays(dks), children);
+            });
+
+            // 3) older → one line per month (expands to weeks → days)
+            const months = groupBy(older, k => k.slice(0, 7));
+            Object.keys(months).sort().reverse().forEach(ym => {
+                const dks = months[ym];
+                const mweeks = groupBy(dks, k => keyOf(new Date(startOfWeek(dayMs(k)))));
+                let children = '';
+                Object.keys(mweeks).sort().reverse().forEach(ws => {
+                    const wdks = mweeks[ws].sort(byDesc);
+                    children += groupNodeHTML('m' + ym + 'w:' + ws, weekLabel(dayMs(ws)),
+                        sumDays(wdks), wdks.map(k => dayNodeHTML(k, data[k])).join(''));
+                });
+                html += groupNodeHTML('m:' + ym, monthLabel(dayMs(dks[0])), sumDays(dks), children);
+            });
+
+            el.history.innerHTML = html;
         }
 
-        function render() { renderToday(); renderHistory(); }
+        function render() { autoCloseStale(); renderToday(); renderWeek(); renderHistory(); }
+
+        // shared click handler for both today + history session lists
+        function onListClick(e) {
+            let n;
+            if (n = e.target.closest('[data-save]'))   return commitEdit(n);
+            if (e.target.closest('[data-cancel]'))     { editing = null; render(); return; }
+            if (n = e.target.closest('[data-del]'))    return deleteSession(n.dataset.del);
+            if (n = e.target.closest('[data-delday]')) { const k = n.dataset.delday; if (confirm(`Delete all sessions for ${k}?`)) deleteDay(k); return; }
+            if (n = e.target.closest('[data-edit]'))   return beginEdit(n.dataset.edit);
+            if (n = e.target.closest('[data-node]'))   return toggleNode(n.dataset.node);
+        }
+
+        // ===== dev helper: fake past data. In console: seed() or seed(14) =====
+        window.seed = function (days = 10) {
+            const data = load();
+            for (let n = 1; n <= days; n++) {
+                const d = new Date(); d.setDate(d.getDate() - n); d.setHours(0,0,0,0);
+                if ((d.getDay()+6)%7 >= 5) continue;            // skip weekends
+                const k = keyOf(d);
+                const inH = 8 + Math.floor(Math.random()*2);    // start 8–9
+                const lunch = 12;
+                const sessions = [
+                    { start: timeToDate(k, `${pad(inH)}:00`), end: timeToDate(k, `${lunch}:00`) },
+                    { start: timeToDate(k, `${lunch}:${30+Math.floor(Math.random()*15)}`), end: timeToDate(k, `${16+Math.floor(Math.random()*2)}:${pad(Math.floor(Math.random()*59))}`) },
+                ];
+                data[k] = sessions;
+            }
+            save(data); render();
+            console.log(`Seeded ${days} day(s) of fake data. Run clearAll() to wipe everything.`);
+        };
+        window.clearAll = function () { localStorage.removeItem(STORE_KEY); openNodes.clear(); render(); console.log('Cleared all tracker data.'); };
 
         function exportCSV() {
             const data = load();
@@ -445,16 +691,14 @@
         el.toggle.addEventListener('click', toggle);
         el.export.addEventListener('click', exportCSV);
         el.addBtn.addEventListener('click', addManual);
-        el.sessions.addEventListener('click', (e) => {
-            const i = e.target.dataset.delSession;
-            if (i != null) deleteSession(Number(i));
-        });
-        el.history.addEventListener('click', (e) => {
-            const k = e.target.dataset.delDay;
-            if (k && confirm(`Delete all sessions for ${k}?`)) deleteDay(k);
-        });
+        el.sessions.addEventListener('click', onListClick);
+        el.history.addEventListener('click', onListClick);
         // re-render when tab regains focus (handles midnight rollover / other tabs)
         document.addEventListener('visibilitychange', () => { if (!document.hidden) render(); });
+        // PWA: register service worker for installability + offline
+        if ('serviceWorker' in navigator) {
+            window.addEventListener('load', () => navigator.serviceWorker.register('sw.js').catch(() => {}));
+        }
         render();
     </script>
 </body>
