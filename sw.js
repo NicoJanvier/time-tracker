@@ -1,5 +1,5 @@
 // Cache-first service worker for offline use. Bump CACHE to force an update.
-const CACHE = 'time-tracker-v3';
+const CACHE = 'time-tracker-v4';
 const ASSETS = ['./', './index.html', './manifest.json', './icon.svg'];
 
 self.addEventListener('install', (e) => {
