@@ -344,6 +344,26 @@
         .faq li { font-size: 0.88rem; color: var(--muted); line-height: 1.5; margin-bottom: 3px; }
         .faq b { color: var(--ink); font-weight: 650; }
         .faq code { background: var(--field); color: var(--ink); padding: 1px 5px; border-radius: 5px; font-size: 0.85em; }
+
+        /* update-available banner */
+        .update-bar {
+            position: fixed; left: 50%; bottom: 18px; z-index: 40;
+            transform: translateX(-50%) translateY(200%);
+            display: flex; align-items: center; justify-content: space-between; gap: 14px;
+            background: var(--accent); color: var(--accent-ink);
+            padding: 11px 12px 11px 18px; border-radius: 14px;
+            box-shadow: var(--shadow); font-size: 0.9rem; font-weight: 600;
+            width: calc(100% - 32px); max-width: 540px;
+            transition: transform 0.35s cubic-bezier(.2,.8,.2,1);
+        }
+        .update-bar.show { transform: translateX(-50%) translateY(0); }
+        .update-bar button {
+            width: auto; flex: 0 0 auto;
+            padding: 8px 16px; border-radius: 10px;
+            font-size: 0.85rem; font-weight: 700;
+            background: var(--accent-ink); color: var(--accent);
+        }
+        .update-bar button:hover { filter: none; }
     </style>
 </head>
 <body>
@@ -436,6 +456,11 @@
                 <p>All dates and clock times follow <b>your browser/system locale</b> automatically — no setting to configure. (So the date order and 12h/24h clock match your device.)</p>
             </div>
         </div>
+    </div>
+
+    <div class="update-bar" id="update-bar">
+        <span>New version available</span>
+        <button id="update-reload">Reload</button>
     </div>
 
     <script>
@@ -849,10 +874,39 @@
 
         // re-render when tab regains focus (handles midnight rollover / other tabs)
         document.addEventListener('visibilitychange', () => { if (!document.hidden) render(); });
-        // PWA: register service worker for installability + offline
+        // ===== PWA: register SW + show an in-app "update available" banner =====
+        let waitingWorker = null, reloading = false;
+        const updateBar = document.getElementById('update-bar');
+        const showUpdateBar = () => updateBar.classList.add('show');
+        document.getElementById('update-reload').addEventListener('click', () => {
+            updateBar.classList.remove('show');
+            if (waitingWorker) waitingWorker.postMessage('SKIP_WAITING');   // real update
+            else location.reload();                                          // demo / fallback
+        });
         if ('serviceWorker' in navigator) {
-            window.addEventListener('load', () => navigator.serviceWorker.register('sw.js').catch(() => {}));
+            // when the new SW takes control, reload once into the fresh version
+            navigator.serviceWorker.addEventListener('controllerchange', () => {
+                if (reloading) return; reloading = true; location.reload();
+            });
+            window.addEventListener('load', () => {
+                navigator.serviceWorker.register('sw.js').then((reg) => {
+                    if (reg.waiting && navigator.serviceWorker.controller) { waitingWorker = reg.waiting; showUpdateBar(); }
+                    reg.addEventListener('updatefound', () => {
+                        const nw = reg.installing;
+                        if (!nw) return;
+                        nw.addEventListener('statechange', () => {
+                            if (nw.state === 'installed' && navigator.serviceWorker.controller) {
+                                waitingWorker = reg.waiting || nw;
+                                showUpdateBar();
+                            }
+                        });
+                    });
+                }).catch(() => {});
+            });
         }
+        // demo helper: preview the banner without a real new version
+        window.fakeUpdate = () => { waitingWorker = null; showUpdateBar(); console.log('Fake update banner shown — Reload just reloads the page.'); };
+
         render();
     </script>
 </body>

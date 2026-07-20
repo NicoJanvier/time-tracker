@@ -3,8 +3,12 @@ const CACHE = 'time-tracker-v3';
 const ASSETS = ['./', './index.html', './manifest.json', './icon.svg'];
 
 self.addEventListener('install', (e) => {
-  e.waitUntil(caches.open(CACHE).then((c) => c.addAll(ASSETS)).then(() => self.skipWaiting()));
+  // do NOT skipWaiting here — wait until the user taps "Reload" in the app
+  e.waitUntil(caches.open(CACHE).then((c) => c.addAll(ASSETS)));
 });
+
+// the page asks us to activate the new version when the user taps Reload
+self.addEventListener('message', (e) => { if (e.data === 'SKIP_WAITING') self.skipWaiting(); });
 
 self.addEventListener('activate', (e) => {
   e.waitUntil(
