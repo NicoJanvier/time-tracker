@@ -136,6 +136,28 @@
         }
         .weekstat b { color: var(--ink); font-weight: 700; font-variant-numeric: tabular-nums; }
 
+        .h2row { display: flex; align-items: center; justify-content: space-between; margin-bottom: 6px; }
+        .h2row h2 { margin-bottom: 0; }
+        .seg {
+            display: inline-flex;
+            background: var(--field);
+            border-radius: 9px;
+            padding: 2px;
+            gap: 2px;
+        }
+        .seg button {
+            width: auto;
+            font-size: 0.72rem;
+            font-weight: 650;
+            padding: 5px 9px;
+            border-radius: 7px;
+            background: transparent;
+            color: var(--muted);
+            transition: background 0.15s, color 0.15s;
+        }
+        .seg button:hover { filter: none; }
+        .seg button.active { background: var(--card-solid); color: var(--ink); box-shadow: 0 1px 2px rgba(0,0,0,0.12); }
+
         button {
             font-family: inherit;
             font-size: 1.05rem;
@@ -284,9 +306,49 @@
         }
         .footer a { color: var(--accent); text-decoration: none; cursor: pointer; font-weight: 600; }
         .footer a:hover { text-decoration: underline; }
+
+        /* help button + FAQ overlay */
+        .help-btn {
+            position: fixed; top: 14px; right: 14px; z-index: 20;
+            width: 36px; height: 36px; padding: 0;
+            border-radius: 50%; border: 1px solid var(--line);
+            background: var(--card); color: var(--muted);
+            font-size: 1.05rem; font-weight: 700; cursor: pointer;
+            box-shadow: var(--shadow);
+            backdrop-filter: saturate(180%) blur(20px);
+            -webkit-backdrop-filter: saturate(180%) blur(20px);
+        }
+        .help-btn:hover { color: var(--ink); filter: none; }
+        .overlay {
+            position: fixed; inset: 0; z-index: 30; display: none;
+            background: rgba(0,0,0,0.45);
+            backdrop-filter: blur(4px); -webkit-backdrop-filter: blur(4px);
+            padding: 24px 16px; overflow-y: auto;
+        }
+        .overlay.open { display: flex; align-items: flex-start; justify-content: center; }
+        .modal {
+            background: var(--card-solid); border: 1px solid var(--line);
+            border-radius: 20px; max-width: 520px; width: 100%;
+            padding: 24px 24px 28px; box-shadow: var(--shadow); margin: auto;
+        }
+        .modal-head { display: flex; align-items: center; justify-content: space-between; margin-bottom: 4px; }
+        .modal-head .title { font-size: 1.2rem; font-weight: 700; letter-spacing: -0.01em; }
+        .modal-close {
+            width: 32px; height: 32px; padding: 0; border: none; border-radius: 9px;
+            background: var(--field); color: var(--muted); font-size: 1rem; cursor: pointer; flex: 0 0 auto;
+        }
+        .modal-close:hover { color: var(--ink); filter: none; }
+        .faq h3 { font-size: 0.95rem; font-weight: 700; color: var(--ink); margin: 20px 0 5px; text-transform: none; letter-spacing: normal; }
+        .faq p { font-size: 0.88rem; color: var(--muted); line-height: 1.55; margin-bottom: 6px; }
+        .faq ul { margin: 4px 0 8px 18px; }
+        .faq li { font-size: 0.88rem; color: var(--muted); line-height: 1.5; margin-bottom: 3px; }
+        .faq b { color: var(--ink); font-weight: 650; }
+        .faq code { background: var(--field); color: var(--ink); padding: 1px 5px; border-radius: 5px; font-size: 0.85em; }
     </style>
 </head>
 <body>
+    <button class="help-btn" id="help-btn" aria-label="How to use" title="How to use">?</button>
+
     <div class="container">
         <header>
             <h1>⏱️ Time Tracker</h1>
@@ -314,13 +376,66 @@
         </div>
 
         <div class="card">
-            <h2>History</h2>
+            <div class="h2row">
+                <h2>History</h2>
+                <div class="seg" id="fmt-toggle">
+                    <button data-fmt="hm">h:m</button>
+                    <button data-fmt="dec">0.00</button>
+                </div>
+            </div>
             <div class="history" id="history"></div>
         </div>
 
         <p class="footer">
-            Stored locally in your browser · <a id="export">Export CSV</a>
+            Stored locally in your browser · <a id="export">Export CSV</a> · <a id="help-link">How to use?</a>
         </p>
+    </div>
+
+    <div class="overlay" id="overlay">
+        <div class="modal" role="dialog" aria-modal="true" aria-label="How to use">
+            <div class="modal-head">
+                <span class="title">How to use ⏱️</span>
+                <button class="modal-close" id="modal-close" aria-label="Close">✕</button>
+            </div>
+            <div class="faq">
+                <h3>Tracking your day</h3>
+                <p>Tap <b>Clock In</b> to start working, <b>Clock Out</b> to stop. The big number is <b>today's total</b>, updating live while you're clocked in. Clock in and out as many times as you like — breaks are just gaps between sessions.</p>
+
+                <h3>Adding or fixing time</h3>
+                <ul>
+                    <li><b>Add manually:</b> pick a date, a start and end time, then <b>+ Add</b> — handy for a day you forgot to track.</li>
+                    <li><b>Edit:</b> tap a session's times to change them.</li>
+                    <li><b>Delete:</b> the ✕ next to a session (or a whole day in History).</li>
+                    <li><b>Overlaps:</b> if a new/edited session overlaps another, you'll be asked to <b>merge</b> them or <b>keep both</b>.</li>
+                    <li><b>Forgot to clock out?</b> A session left running overnight is automatically closed at the end of that day (marked <i>auto-closed</i>), so it never bleeds into the next day.</li>
+                </ul>
+
+                <h3>History &amp; grouping</h3>
+                <p>History collapses progressively as time passes: <b>this week</b> shows one line per day, <b>earlier this month</b> groups into weeks, and <b>older</b> months group into a single line. Tap any row to expand it down to the individual sessions.</p>
+
+                <h3>Hours format: <code>h:m</code> vs <code>0.00</code></h3>
+                <p>The toggle at the top of History switches how totals read:</p>
+                <ul>
+                    <li><code>h:m</code> — hours and minutes, e.g. <b>7h 45m</b> (exact).</li>
+                    <li><code>0.00</code> — <b>decimal hours rounded to the nearest quarter</b> (0.25 = 15 min), e.g. <b>7.75</b>. Ideal for pasting into a timesheet.</li>
+                </ul>
+                <p><b>How rounding adds up:</b> in decimal mode each <b>day</b> is rounded to a quarter-hour first, then weeks and months are the <b>sum of those rounded days</b> — so the numbers always reconcile (a week equals its days added up). Individual sessions always stay in <code>h:m</code>. Because each day is rounded, a long period's decimal total can differ by a few minutes from the raw tracked time — that's expected, and matches how per-day timesheet entries work.</p>
+
+                <h3>Where your data lives</h3>
+                <p>Everything is stored <b>locally in this browser</b> (using <code>localStorage</code>) — nothing is sent anywhere, there's no account, and no sync. That means:</p>
+                <ul>
+                    <li>Your data stays on <b>this device &amp; this browser</b> only. A different browser or device starts empty.</li>
+                    <li>Clearing your browser's site data (or "clear cookies/storage") will <b>erase it</b>.</li>
+                    <li>Use <b>Export CSV</b> for a backup or to feed another tool — one row per day with decimal hours.</li>
+                </ul>
+
+                <h3>Install on your phone</h3>
+                <p>This is a PWA: open it in your mobile browser and choose <b>Add to Home Screen</b>. It then launches full-screen like a native app and <b>works offline</b>.</p>
+
+                <h3>Dates &amp; times</h3>
+                <p>All dates and clock times follow <b>your browser/system locale</b> automatically — no setting to configure. (So the date order and 12h/24h clock match your device.)</p>
+            </div>
+        </div>
     </div>
 
     <script>
@@ -343,10 +458,23 @@
         const startOfWeek = (d) => { const x = new Date(d); x.setHours(0,0,0,0); x.setDate(x.getDate() - ((x.getDay()+6)%7)); return x.getTime(); };
 
         // ===== Time helpers =====
+        const FMT_KEY = 'tt_fmt';
+        let fmtMode = localStorage.getItem(FMT_KEY) === 'dec' ? 'dec' : 'hm';   // 'hm' | 'dec'
         const fmtDuration = (ms) => {
             const totalMin = Math.floor(ms / 60000);
             return `${Math.floor(totalMin / 60)}h ${pad(totalMin % 60)}m`;
         };
+        // hours rounded to nearest quarter (0.25) — as a number
+        const roundQuarterH = (ms) => Math.round(ms / 3600000 * 4) / 4;
+        // decimal hours, rounded to nearest quarter (e.g. 9.25, 9.50)
+        const fmtDecimal = (ms) => roundQuarterH(ms).toFixed(2);
+        // single-day duration honoring the chosen display mode
+        const fmtDur = (ms) => fmtMode === 'dec' ? fmtDecimal(ms) : fmtDuration(ms);
+        // group total (week/month/"this week"): round-then-sum in decimal mode so
+        // rows reconcile with their children; exact sum in h:m mode.
+        const fmtDaysTotal = (msList) => fmtMode === 'dec'
+            ? msList.reduce((s, ms) => s + roundQuarterH(ms), 0).toFixed(2)
+            : fmtDuration(msList.reduce((s, ms) => s + ms, 0));
         const fmtTotalHTML = (ms) => {
             const totalMin = Math.floor(ms / 60000);
             return `${Math.floor(totalMin / 60)}<span class="u">h</span>${pad(totalMin % 60)}<span class="u">m</span>`;
@@ -559,17 +687,16 @@
 
         function renderWeek() {
             const data = load(); const now = Date.now(); const sow = startOfWeek(new Date());
-            let sum = 0;
-            for (const k of Object.keys(data)) {
-                if (new Date(k + 'T00:00').getTime() >= sow) sum += dayTotal(data[k], now);
-            }
-            el.weekstat.innerHTML = `This week · <b>${fmtDuration(sum)}</b>`;
+            const dayMsList = Object.keys(data)
+                .filter(k => new Date(k + 'T00:00').getTime() >= sow)
+                .map(k => dayTotal(data[k], now));
+            el.weekstat.innerHTML = `This week · <b>${fmtDaysTotal(dayMsList)}</b>`;
         }
 
         // a single day, expandable to its (editable) sessions
         function dayNodeHTML(k, arr) {
             const id = 'd:' + k, open = openNodes.has(id);
-            const total = fmtDuration(dayTotal(arr, Date.now()));
+            const total = fmtDur(dayTotal(arr, Date.now()));
             return `<div class="hnode${open ? ' open' : ''}">` +
                 `<div class="hnode-head" data-node="${id}">` +
                     `<span class="caret">▶</span>` +
@@ -582,13 +709,13 @@
         }
 
         // a collapsible group (week or month) wrapping child nodes
-        function groupNodeHTML(id, label, totalMs, childrenHTML) {
+        function groupNodeHTML(id, label, totalStr, childrenHTML) {
             const open = openNodes.has(id);
             return `<div class="hnode${open ? ' open' : ''}">` +
                 `<div class="hnode-head group" data-node="${id}">` +
                     `<span class="caret">▶</span>` +
                     `<span class="label">${label}</span>` +
-                    `<span class="hrs">${fmtDuration(totalMs)}</span>` +
+                    `<span class="hrs">${totalStr}</span>` +
                 `</div>` +
                 `<div class="hnode-body">${childrenHTML}</div>` +
             `</div>`;
@@ -603,7 +730,8 @@
             }
             const sow = startOfWeek(new Date()), som = monthStart(new Date());
             const byDesc = (a, b) => dayMs(b) - dayMs(a);
-            const sumDays = (dks) => dks.reduce((s, k) => s + dayTotal(data[k], now), 0);
+            // group total: round-then-sum (decimal) or exact sum (h:m) over member days
+            const groupTotal = (dks) => fmtDaysTotal(dks.map(k => dayTotal(data[k], now)));
 
             const thisWeek  = keys.filter(k => dayMs(k) >= sow).sort(byDesc);
             const thisMonth = keys.filter(k => dayMs(k) < sow && dayMs(k) >= som);
@@ -619,7 +747,7 @@
             Object.keys(weeks).sort().reverse().forEach(ws => {
                 const dks = weeks[ws].sort(byDesc);
                 const children = dks.map(k => dayNodeHTML(k, data[k])).join('');
-                html += groupNodeHTML('w:' + ws, weekLabel(dayMs(ws)), sumDays(dks), children);
+                html += groupNodeHTML('w:' + ws, weekLabel(dayMs(ws)), groupTotal(dks), children);
             });
 
             // 3) older → one line per month (expands to weeks → days)
@@ -631,9 +759,9 @@
                 Object.keys(mweeks).sort().reverse().forEach(ws => {
                     const wdks = mweeks[ws].sort(byDesc);
                     children += groupNodeHTML('m' + ym + 'w:' + ws, weekLabel(dayMs(ws)),
-                        sumDays(wdks), wdks.map(k => dayNodeHTML(k, data[k])).join(''));
+                        groupTotal(wdks), wdks.map(k => dayNodeHTML(k, data[k])).join(''));
                 });
-                html += groupNodeHTML('m:' + ym, monthLabel(dayMs(dks[0])), sumDays(dks), children);
+                html += groupNodeHTML('m:' + ym, monthLabel(dayMs(dks[0])), groupTotal(dks), children);
             });
 
             el.history.innerHTML = html;
@@ -685,14 +813,40 @@
             URL.revokeObjectURL(url);
         }
 
+        // ===== display-format toggle (h:m vs decimal quarter-hours) =====
+        const fmtToggle = document.getElementById('fmt-toggle');
+        function syncFmtToggle() {
+            fmtToggle.querySelectorAll('button').forEach(b =>
+                b.classList.toggle('active', b.dataset.fmt === fmtMode));
+        }
+        fmtToggle.addEventListener('click', (e) => {
+            const b = e.target.closest('[data-fmt]'); if (!b) return;
+            fmtMode = b.dataset.fmt;
+            localStorage.setItem(FMT_KEY, fmtMode);
+            syncFmtToggle();
+            renderWeek(); renderHistory();
+        });
+
         // ===== Init =====
         el.date.textContent = new Date().toLocaleDateString([], { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' });
         el.addDate.value = todayKey();
+        syncFmtToggle();
         el.toggle.addEventListener('click', toggle);
         el.export.addEventListener('click', exportCSV);
         el.addBtn.addEventListener('click', addManual);
         el.sessions.addEventListener('click', onListClick);
         el.history.addEventListener('click', onListClick);
+
+        // ===== help / FAQ overlay =====
+        const overlay = document.getElementById('overlay');
+        const openHelp = () => overlay.classList.add('open');
+        const closeHelp = () => overlay.classList.remove('open');
+        document.getElementById('help-btn').addEventListener('click', openHelp);
+        document.getElementById('help-link').addEventListener('click', openHelp);
+        document.getElementById('modal-close').addEventListener('click', closeHelp);
+        overlay.addEventListener('click', (e) => { if (e.target === overlay) closeHelp(); });
+        document.addEventListener('keydown', (e) => { if (e.key === 'Escape') closeHelp(); });
+
         // re-render when tab regains focus (handles midnight rollover / other tabs)
         document.addEventListener('visibilitychange', () => { if (!document.hidden) render(); });
         // PWA: register service worker for installability + offline
